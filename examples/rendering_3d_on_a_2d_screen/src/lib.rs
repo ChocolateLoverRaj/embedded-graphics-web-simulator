@@ -45,9 +45,7 @@ pub fn main_js() -> Result<(), JsValue> {
 
   <div id="custom-container"></div>
   <footer>
-    🦀 A rust-embedded x rust-wasm experiment 🦀
-    <br />Made using
-    <a href="https://github.com/jamwaffles" target="_blank">@jamwaffles'</a>
+    <a href="https://github.com/ChocolateLoverRaj/embedded-graphics-web-simulator">Link to GitHub repository</a>
     <a href="https://github.com/embedded-graphics/simulator" target="_blank">Embedded Graphics</a>
   </footer>
     "#,
