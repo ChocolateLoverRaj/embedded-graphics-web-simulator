@@ -1,27 +1,32 @@
+pub mod colors;
+pub mod data;
+pub mod triangles;
+
+use std::cmp::Ordering;
+
+use colors::COLORS;
+use data::{
+    degrees_to_radians, point_of_intersection_of_plane_and_normal_line, Plane, PointOrVector, Ray,
+    CAMERA_DIRECTION, CAMERA_POS, PLANE_CONTAINING_X_AXIS_AND_CAMERA,
+};
 use embedded_graphics_web_simulator::{
     display::WebSimulatorDisplay, output_settings::OutputSettingsBuilder,
 };
+use gloo_timers::future::TimeoutFuture;
+use js_sys::wasm_bindgen::JsValue;
+use triangles::get_triangles;
 use wasm_bindgen::prelude::*;
-use web_sys::console;
 
 use embedded_graphics::{
-    image::Image,
-    mono_font::{ascii::FONT_6X9, MonoTextStyle},
-    pixelcolor::Rgb565,
-    prelude::{Point, Primitive, WebColors},
-    primitives::{Circle, PrimitiveStyle},
-    text::Text,
-    Drawable,
+    draw_target::DrawTarget,
+    pixelcolor::Rgb888,
+    prelude::{Point, RgbColor, Size, WebColors},
+    primitives::{Circle, PrimitiveStyle, Rectangle, StyledDrawable, Triangle},
 };
-
-use tinybmp::Bmp;
-
+use wasm_bindgen_futures::spawn_local;
 // This is like the `main` function, except for JavaScript.
 #[wasm_bindgen(start)]
 pub fn main_js() -> Result<(), JsValue> {
-    // This provides better error messages in debug mode.
-    // It's disabled in release mode so it doesn't bloat up the file size.
-    #[cfg(debug_assertions)]
     console_error_panic_hook::set_once();
 
     let document = web_sys::window()
@@ -35,7 +40,7 @@ pub fn main_js() -> Result<(), JsValue> {
     body.set_inner_html(
         r#"
     <header>
-    Embedded Graphics Web Simulator!
+    3D First person (Very basic) Drawing
   </header>
 
   <div id="custom-container"></div>
@@ -48,43 +53,136 @@ pub fn main_js() -> Result<(), JsValue> {
     "#,
     );
 
-    let output_settings = OutputSettingsBuilder::new()
-        .scale(1)
-        .pixel_spacing(1)
-        .build();
-    let mut text_display = WebSimulatorDisplay::new((128, 64), &output_settings, None);
-    let mut img_display = WebSimulatorDisplay::new(
-        (128, 128),
-        &output_settings,
-        document.get_element_by_id("custom-container").as_ref(),
-    );
+    spawn_local(async {
+        let output_settings = OutputSettingsBuilder::new().scale(1).build();
+        let screen_size = 800;
+        let mut display =
+            WebSimulatorDisplay::new((screen_size, screen_size), &output_settings, None);
 
-    let style = MonoTextStyle::new(&FONT_6X9, Rgb565::CSS_WHITE);
-
-    if Text::new("Hello, wasm world!", Point::new(10, 30), style)
-        .draw(&mut text_display)
-        .is_err()
-    {
-        console::log_1(&"Couldn't draw text".into());
-    }
-    text_display.flush().expect("could not flush buffer");
-
-    // Load the BMP image
-    let bmp = Bmp::from_slice(include_bytes!("./assets/rust-pride.bmp")).unwrap();
-    let image = Image::new(&bmp, Point::new(32, 32));
-    if image.draw(&mut img_display).is_err() {
-        console::log_1(&"Couldn't draw image".into());
-    }
-
-    if Circle::new(Point::new(29, 29), 70)
-        .into_styled(PrimitiveStyle::with_stroke(Rgb565::CSS_WHITE, 1))
-        .draw(&mut img_display)
-        .is_err()
-    {
-        console::log_1(&"Couldn't draw circle".into());
-    }
-
-    img_display.flush().expect("could not flush buffer");
+        let viewing_plane_x = {
+            let fov = degrees_to_radians(90.0);
+            let opposite = 1.0;
+            let angle = fov / 2.0;
+            let adjacent = opposite / angle.tan();
+            CAMERA_POS.x - adjacent
+        };
+        let viewing_plane = Plane {
+            a: viewing_plane_x,
+            b: 0.0,
+            c: 0.0,
+            d: 0.0,
+        };
+        let mut color_iter = COLORS.iter().cycle();
+        loop {
+            display.clear(Rgb888::BLACK).unwrap();
+            // Draw a crosshair
+            let crosshair_thickness = 5;
+            let crosshair_size = 50;
+            let center = Point::new_equal((screen_size / 2) as i32);
+            let crosshair_style = PrimitiveStyle::with_fill(Rgb888::CSS_GRAY);
+            // Vertical crosshair
+            Rectangle::with_center(center, Size::new(crosshair_thickness, crosshair_size))
+                .draw_styled(&crosshair_style, &mut display)
+                .unwrap();
+            // Horizontal crosshair
+            Rectangle::with_center(center, Size::new(crosshair_size, crosshair_thickness))
+                .draw_styled(&crosshair_style, &mut display)
+                .unwrap();
+            let triangles_to_draw = {
+                let sorted_triangles = {
+                    let mut sorted_triangles = vec![];
+                    let goes_in_front_of =
+                        |points0: &[PointOrVector; 3], points1: &[PointOrVector; 3]| {
+                            let mut i = 0;
+                            loop {
+                                if Ray::from_start_to_end(CAMERA_POS, points0[i])
+                                    .multiplier_to_plane_intersection(Plane::from_3_points(
+                                        *points1,
+                                    ))
+                                    .is_some_and(|multiplier| multiplier > 1.0)
+                                {
+                                    break true;
+                                }
+                                i += 1;
+                                if i == points0.len() {
+                                    break false;
+                                }
+                            }
+                        };
+                    for triangle in get_triangles() {
+                        sorted_triangles.insert(
+                            {
+                                if sorted_triangles.len() == 0 {
+                                    0
+                                } else {
+                                    let mut i = 0;
+                                    loop {
+                                        match sorted_triangles.get(i) {
+                                            Some(triangle2) => {
+                                                if goes_in_front_of(triangle2, &triangle)
+                                                    | !goes_in_front_of(&triangle, triangle2)
+                                                {
+                                                    break;
+                                                }
+                                            }
+                                            None => {}
+                                        }
+                                        i += 1;
+                                        if i == sorted_triangles.len() {
+                                            break;
+                                        }
+                                    }
+                                    i
+                                }
+                            },
+                            triangle,
+                        );
+                    }
+                    sorted_triangles
+                };
+                sorted_triangles
+                    .into_iter()
+                    .map(|points| {
+                        points.map(|point| {
+                            let vector_from_camera_to_point = point - CAMERA_POS;
+                            let point_on_viewing_plane = {
+                                let x_distance = viewing_plane_x - CAMERA_POS.x;
+                                let scale = x_distance / vector_from_camera_to_point.x;
+                                let vector_to_point_on_viewing_plane =
+                                    vector_from_camera_to_point * scale;
+                                CAMERA_POS + vector_to_point_on_viewing_plane
+                            };
+                            let point_on_screen = Point::new(
+                                (screen_size as f64 / 2.0
+                                    + point_on_viewing_plane.y * screen_size as f64 / 2.0)
+                                    as i32,
+                                (screen_size as f64 / 2.0
+                                    - point_on_viewing_plane.z * screen_size as f64 / 2.0)
+                                    as i32,
+                            );
+                            point_on_screen
+                        })
+                    })
+                    .collect::<Vec<_>>()
+            };
+            for triangle in triangles_to_draw {
+                let triangle_color = color_iter.next().unwrap();
+                for point_on_screen in triangle {
+                    Circle::with_center(point_on_screen, 5)
+                        .draw_styled(&PrimitiveStyle::with_fill(*triangle_color), &mut display)
+                        .unwrap();
+                    display.flush().unwrap();
+                    TimeoutFuture::new(300).await;
+                }
+                Triangle::new(triangle[0], triangle[1], triangle[2])
+                    .draw_styled(&PrimitiveStyle::with_fill(*triangle_color), &mut display)
+                    .unwrap();
+                display.flush().unwrap();
+                TimeoutFuture::new(600).await;
+            }
+            TimeoutFuture::new(10000).await;
+        }
+    });
 
     Ok(())
 }

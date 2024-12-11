@@ -1,2 +1,2 @@
 [alias]
-run-wasm = "run --release --package run-wasm -- --package basic_example"
+run-wasm = "run --release --package run-wasm -- --package rendering_3d_on_a_2d_screen"

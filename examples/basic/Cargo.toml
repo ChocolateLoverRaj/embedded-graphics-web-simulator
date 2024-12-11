@@ -1,6 +1,6 @@
 # You must change these to your own details.
 [package]
-name = "basic_example"
+name = "rendering_3d_on_a_2d_screen"
 description = "A basic example showing how to use the web simulator"
 version = "0.1.0"
 authors = ["Rahul Thakoor <rahul.thakoor@gmail.com>"]
@@ -22,22 +22,29 @@ lto = true
 [dependencies]
 # The `wasm-bindgen` crate provides the bare minimum functionality needed
 # to interact with JavaScript.
-wasm-bindgen = "0.2.45"
+wasm-bindgen-futures = "0.4"
+# The `web-sys` crate allows you to interact with the various browser APIs,wasm-bindgen = "0.2.45"
 embedded-graphics-web-simulator = { path = "../.." }
 tinybmp = "0.5"
 console_error_panic_hook = "0.1.5"
 embedded-graphics = "0.8"
-# The `web-sys` crate allows you to interact with the various browser APIs,
+js-sys = "0.3.22"
+wasm-bindgen = "0.2.99"
+gloo-console = "0.3.0"
+[dependencies.gloo-timers]
+version = "0.3.0"
+features = ["futures"]
+
 # like the DOM.
 [dependencies.web-sys]
 version = "0.3"
 features = [
-  'console',
-  'CanvasRenderingContext2d',
-  'Document',
-  'Element',
-  'HtmlCanvasElement',
-  'Window',
+    "console",
+    "CanvasRenderingContext2d",
+    "Document",
+    "Element",
+    "HtmlCanvasElement",
+    "Window",
 ]
 
 

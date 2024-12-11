@@ -1,0 +1,32 @@
+use embedded_graphics::{
+    pixelcolor::Rgb888,
+    prelude::{RgbColor, WebColors},
+};
+
+pub const COLORS: &[Rgb888] = &[
+    Rgb888::RED,
+    Rgb888::CSS_ORANGE,
+    Rgb888::YELLOW,
+    Rgb888::GREEN,
+    Rgb888::BLUE,
+    Rgb888::CSS_PURPLE,
+    Rgb888::CSS_LIGHT_PINK,
+    Rgb888::CSS_HOT_PINK,
+    Rgb888::CSS_AQUAMARINE,
+    Rgb888::CSS_MIDNIGHT_BLUE,
+    Rgb888::CSS_CORNFLOWER_BLUE,
+    Rgb888::CSS_SPRING_GREEN,
+    Rgb888::YELLOW,
+    Rgb888::GREEN,
+    Rgb888::BLUE,
+    Rgb888::CSS_PURPLE,
+    Rgb888::CSS_LIGHT_PINK,
+    Rgb888::CSS_HOT_PINK,
+    Rgb888::CSS_AQUAMARINE,
+    Rgb888::CSS_MIDNIGHT_BLUE,
+    Rgb888::CSS_CORNFLOWER_BLUE,
+    Rgb888::CSS_SPRING_GREEN,
+    Rgb888::RED,
+    Rgb888::CSS_ORANGE,
+    Rgb888::CSS_BROWN,
+];
