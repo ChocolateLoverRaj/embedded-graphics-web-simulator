@@ -89,21 +89,29 @@ pub fn main_js() -> Result<(), JsValue> {
             let triangles_to_draw = {
                 let sorted_triangles = {
                     let mut sorted_triangles = vec![];
-                    let goes_in_front_of =
+                    enum TriangleOrdering {
+                        InFront,
+                        Behind,
+                        NoOverlap,
+                    }
+                    let get_ordering =
                         |points0: &[PointOrVector; 3], points1: &[PointOrVector; 3]| {
                             let mut i = 0;
                             loop {
-                                if Ray::from_start_to_end(CAMERA_POS, points0[i])
+                                match Ray::from_start_to_end(CAMERA_POS, points0[i])
                                     .multiplier_to_plane_intersection(Plane::from_3_points(
                                         *points1,
-                                    ))
-                                    .is_some_and(|multiplier| multiplier > 1.0)
-                                {
-                                    break true;
+                                    )) {
+                                    Some(multiplier) => match multiplier.partial_cmp(&1.0) {
+                                        Some(Ordering::Greater) => break TriangleOrdering::InFront,
+                                        Some(Ordering::Less) => break TriangleOrdering::Behind,
+                                        _ => {}
+                                    },
+                                    None => {}
                                 }
                                 i += 1;
                                 if i == points0.len() {
-                                    break false;
+                                    break TriangleOrdering::NoOverlap;
                                 }
                             }
                         };
@@ -117,10 +125,9 @@ pub fn main_js() -> Result<(), JsValue> {
                                     loop {
                                         match sorted_triangles.get(i) {
                                             Some(triangle2) => {
-                                                if goes_in_front_of(triangle2, &triangle)
-                                                    | !goes_in_front_of(&triangle, triangle2)
-                                                {
-                                                    break;
+                                                match get_ordering(&triangle, triangle2) {
+                                                    TriangleOrdering::Behind => break,
+                                                    _ => {}
                                                 }
                                             }
                                             None => {}
